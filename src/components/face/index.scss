@@ -1,6 +1,27 @@
-.operaion {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 460px;
+.contentWrap{
+  border: 1px dot peru;
+  width: 600px;
+  height: 500px;
+  border-radius: 10px;
+  .operaion {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+  }
+  .imgWrap{
+    margin: 20px;
+    .ant-upload-list-item-container{
+      width: 360px !important;
+      height: 360px !important;
+      .ant-upload-list-item{
+        .ant-upload-list-item-thumbnail img{
+          object-fit: cover !important;
+        }
+       
+      }
+    }
+   
+  }
 }
+

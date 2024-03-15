@@ -1,87 +1,81 @@
 import * as faceapi from "@vladmandic/face-api/dist/face-api.esm.js";
 import { useEffect, useState } from "react";
-import { Button } from "antd";
+import {
+  GetProp,
+  Tabs,
+  Upload,
+  UploadFile,
+  UploadProps,
+  TabsProps,
+} from "antd";
 import "./index.scss";
+import DetectVideo from "./DetecVideo";
+import DetecImage from "./DetecImage";
+
+type FileType = Parameters<GetProp<UploadProps, "beforeUpload">>[0];
 
 const DetectFace = () => {
   const video = document.getElementById("video");
+  const [type, setType] = useState<"video" | "image">("image");
   const [isReady, setIsReady] = useState(false);
   const [isOpenVideo, setIsoOpenVideo] = useState(false);
   const [emotion, setEmotion] = useState("");
-  const startVideo = () => {
-    navigator.getUserMedia(
-      { video: { width: 1280, height: 720 } },
-      (stream: any) => {
-        video!.srcObject = stream;
-        video!.onloadedmetadata = (e) => {
-          video!.play();
-          setIsoOpenVideo(true);
-        };
-      },
-      (err) => {
-        console.error(`The following error occurred: ${err.name}`);
-      }
-    );
-  };
-
-  const stopVideo = () => {
-    const stream = video!.srcObject as MediaStream;
-    const tracks = stream.getTracks();
-    tracks.forEach((track) => {
-      track.stop();
-    });
-    video!.srcObject = null;
-    setIsoOpenVideo(false);
-  };
-
-  // video.addEventListener("play", () => {
-  //   const canvas = faceapi.createCanvasFromMedia(video);
-  //   // const canvas = document.createElement("canvas");
-  //   canvas.style.position = "absolute";
-  //   document.body.append(canvas);
-  //   const displaySize = { width: video.width, height: video.height };
-  //   faceapi.matchDimensions(canvas, displaySize);
-  //   setInterval(async () => {
-  //     const detections = await faceapi
-  //       .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
-  //       .withFaceLandmarks()
-  //       .withFaceExpressions();
-  //     const resizedDetections = faceapi.resizeResults(detections, displaySize);
-  //     canvas?.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
-  //     faceapi.draw.drawDetections(canvas, resizedDetections);
-  //     faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
-  //     faceapi.draw.drawFaceExpressions(canvas, resizedDetections);
-  //   }, 100);
-  // });
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const items: TabsProps["items"] = [
+    {
+      key: "image",
+      label: "检测图片",
+      children: <DetecImage />,
+    },
+    {
+      key: "video",
+      label: "检测视频",
+      children: <DetectVideo />,
+    },
+  ];
 
   const init = () => {
-    const dir =
-      "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights"; //
+    // const dir =
+    //   "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights"; //
+    const dir = "/models";
     Promise.all([
       faceapi.nets.ssdMobilenetv1.loadFromUri(dir),
       faceapi.nets.tinyFaceDetector.loadFromUri(dir),
       faceapi.nets.faceLandmark68Net.loadFromUri(dir),
       faceapi.nets.faceRecognitionNet.loadFromUri(dir),
       faceapi.nets.faceExpressionNet.loadFromUri(dir),
+      faceapi.nets.ageGenderNet.loadFromUri(dir),
     ]).then(() => {
       setIsReady(true);
       console.log("loaded all");
     });
+  };
+  const onChange: UploadProps["onChange"] = ({
+    fileList: newFileList,
+  }: {
+    fileList: UploadFile[];
+  }) => {
+    setFileList(newFileList);
+  };
 
-    // // 获取图像，并进行人脸检测
-    // const img = document.getElementById("img");
-    // faceapi.detectAllFaces(img).then((faces) => {
-    //   // 在canvas中绘制人脸边界框
-    //   faces.forEach((face) => {
-    //     const box = face.box;
-    //     ctx.strokeStyle = "red";
-    //     ctx.strokeRect(box.x, box.y, box.width, box.height);
-    //   });
-    // });
+  const onPreview = async (file: UploadFile) => {
+    let src = file.url as string;
+    if (!src) {
+      src = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file.originFileObj as FileType);
+        reader.onload = () => resolve(reader.result as string);
+      });
+    }
+    const image = new Image();
+    image.src = src;
+    const imgWindow = window.open(src);
+    imgWindow?.document.write(image.outerHTML);
   };
 
   const startAnalysisImg = () => {
-    const img = document.getElementById("img");
+    const img = document.getElementsByTagName("img")[0];
+    img.crossOrigin = "anonymous";
     // const canvas = document.createElement("canvas");
     // canvas.style.position = "absolute";
     // document.body.append(canvas);
@@ -90,6 +84,7 @@ const DetectFace = () => {
       .detectAllFaces(img)
       .withFaceLandmarks()
       .withFaceExpressions()
+      .withAgeAndGender()
       .then((result) => {
         console.log("result", result);
         if (result.length > 0) {
@@ -102,39 +97,53 @@ const DetectFace = () => {
           // ctx.strokeStyle = "red";
           // ctx.strokeRect(box.x, box.y, box.width, box.height);
           // ctx?.fillText(emotion, box.x, box.y - 10);
+        } else {
+          // img cross origin 可能会导致检测失败
+          console.error("no face detected", img);
         }
       });
   };
   useEffect(() => {
     init();
   }, []);
+  console.log("fileList", fileList);
   return (
-    <>
-      <div className="operaion">
-        <Button
-          disabled={!isReady}
-          type="primary"
-          onClick={isOpenVideo ? stopVideo : startVideo}
-        >
-          {isOpenVideo ? "Stop Video" : "Start Video"}
-        </Button>
-        <Button disabled={!isReady} type="primary" onClick={startAnalysisImg}>
-          Start Analysis Image
-        </Button>
-      </div>
-      <img
-        id="img"
-        crossOrigin="anonymous"
-        src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTQqeYZMbqKOVTOo_uyiGMS1WBcXieWBSx5CA&usqp=CAU"
-        alt="laughting face"
-        style={{ width: 200, height: 200 }}
+    <div className="contentWrap">
+      <Tabs
+        defaultActiveKey="1"
+        items={items}
+        onChange={(key: any) => setType(key)}
       />
-      <div>
-        {`The above person is `}{" "}
-        <span>{`${emotion ? emotion : "analysising"}`}</span>
+      {/* <div className="imgWrap">
+        <img
+          id="img"
+          crossOrigin="anonymous"
+          src={fileList[0]?.thumbUrl}
+          // src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTQqeYZMbqKOVTOo_uyiGMS1WBcXieWBSx5CA&usqp=CAU"
+          alt="laughting face"
+          style={{ width: 200, height: 200 }}
+        />
+
+        <Upload
+          listType="picture-card"
+          multiple={false}
+          maxCount={1}
+          fileList={fileList}
+          onChange={onChange}
+          onPreview={onPreview}
+          beforeUpload={() => false}
+          style={{ display: "none" }}
+        >
+          Upload
+        </Upload>
+        <div>
+          {`The above person is `}{" "}
+          <span>{`${emotion ? emotion : "analysising"}`}</span>
+        </div>
       </div>
-      <video id="video" style={{ width: 400, height: 450 }} />
-    </>
+
+      <video id="video" style={{ width: 400, height: 450 }} /> */}
+    </div>
   );
 };
 export default DetectFace;
